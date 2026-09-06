@@ -1,5 +1,6 @@
 import { store } from './state.js';
 import { renderNavbar } from './components/navbar.js';
+import { renderAuthGateway } from './components/authGateway.js';
 import { renderDashboardHero } from './components/dashboardHeroView.js';
 import { renderDashboard } from './components/dashboardView.js';
 import { renderComposer } from './components/composerView.js';
@@ -12,13 +13,21 @@ const navbarRoot = document.getElementById('navbar-root');
 const mainContent = document.getElementById('main-content');
 
 function renderApp() {
-  // 1. Render navbar
+  // If user is not signed into their hub, show the landing & sign up / log in gateway
+  if (!store.currentUser) {
+    navbarRoot.innerHTML = '';
+    navbarRoot.style.display = 'none';
+    renderAuthGateway(mainContent);
+    return;
+  }
+
+  // User is logged into their personal hub
+  navbarRoot.style.display = 'block';
   renderNavbar(navbarRoot);
 
-  // 2. Render Active View
   switch (store.currentTab) {
     case 'dashboard':
-      // The cool copyright-free image hero that changes every time user exits & returns
+      // The rotating lookbook hero that rotates visuals every visit
       renderDashboardHero(mainContent);
       break;
     case 'command':

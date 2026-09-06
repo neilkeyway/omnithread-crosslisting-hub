@@ -1,13 +1,6 @@
 import { PLATFORMS } from './platforms.js';
 
-const STORAGE_KEYS = {
-  PLATFORMS: 'omnithread_platforms_v1',
-  CLOTHES: 'omnithread_clothes_v1',
-  NOTIFICATIONS: 'omnithread_notifications_v1',
-  SETTINGS: 'omnithread_settings_v1'
-};
-
-// Initial realistic apparel inventory with vector placeholder icons
+// Initial realistic apparel inventory with vector placeholder icons for new hubs
 const INITIAL_CLOTHES = [
   {
     id: 'item_01',
@@ -26,6 +19,7 @@ const INITIAL_CLOTHES = [
       poshmark: 245
     },
     platforms: ['fb_marketplace', 'ebay', 'depop', 'grailed'],
+    photos: [],
     status: 'active',
     delistedPlatforms: [],
     soldDetails: null,
@@ -48,6 +42,7 @@ const INITIAL_CLOTHES = [
       vinted: 160
     },
     platforms: ['depop', 'ebay', 'mercari', 'vinted'],
+    photos: [],
     status: 'active',
     delistedPlatforms: [],
     soldDetails: null,
@@ -70,6 +65,7 @@ const INITIAL_CLOTHES = [
       poshmark: 125
     },
     platforms: ['fb_marketplace', 'ebay', 'depop', 'poshmark'],
+    photos: [],
     status: 'active',
     delistedPlatforms: [],
     soldDetails: null,
@@ -91,6 +87,7 @@ const INITIAL_CLOTHES = [
       grailed: 150
     },
     platforms: ['depop', 'ebay', 'grailed'],
+    photos: [],
     status: 'active',
     delistedPlatforms: [],
     soldDetails: null,
@@ -112,6 +109,7 @@ const INITIAL_CLOTHES = [
       fb_marketplace: 275
     },
     platforms: ['ebay', 'fb_marketplace'],
+    photos: [],
     status: 'sold',
     delistedPlatforms: ['ebay'],
     soldDetails: {
@@ -147,14 +145,30 @@ const INITIAL_NOTIFICATIONS = [
 class StateManager {
   constructor() {
     this.listeners = [];
-    this.currentTab = 'dashboard'; // 'dashboard', 'composer', 'inventory', 'platforms', 'sales'
+    this.currentTab = 'dashboard'; // 'dashboard', 'command', 'composer', 'inventory', 'platforms', 'sales'
+    this.currentUser = null;
     this.init();
   }
 
   init() {
-    this.platforms = this.load(STORAGE_KEYS.PLATFORMS, PLATFORMS);
-    this.clothes = this.load(STORAGE_KEYS.CLOTHES, INITIAL_CLOTHES);
-    this.notifications = this.load(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+    // Check if a session was stored
+    this.currentUser = this.load('omnithread_session_user', null);
+    this.loadUserData();
+  }
+
+  loadUserData() {
+    const userPrefix = this.currentUser ? `omnithread_${this.currentUser.email.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : 'omnithread_guest';
+    
+    this.platforms = this.load(`${userPrefix}_platforms`, PLATFORMS);
+    this.clothes = this.load(`${userPrefix}_clothes`, INITIAL_CLOTHES);
+    this.notifications = this.load(`${userPrefix}_notifications`, INITIAL_NOTIFICATIONS);
+  }
+
+  saveUserData() {
+    const userPrefix = this.currentUser ? `omnithread_${this.currentUser.email.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : 'omnithread_guest';
+    this.save(`${userPrefix}_platforms`, this.platforms);
+    this.save(`${userPrefix}_clothes`, this.clothes);
+    this.save(`${userPrefix}_notifications`, this.notifications);
   }
 
   load(key, fallback) {
@@ -188,6 +202,26 @@ class StateManager {
     });
   }
 
+  // --- Auth / Multi-User Support ---
+  login(email) {
+    const normalizedEmail = email.trim().toLowerCase();
+    this.currentUser = {
+      email: normalizedEmail,
+      name: normalizedEmail.split('@')[0],
+      loggedInAt: new Date().toISOString()
+    };
+    this.save('omnithread_session_user', this.currentUser);
+    this.loadUserData();
+    this.currentTab = 'dashboard';
+    this.notify();
+  }
+
+  logout() {
+    this.currentUser = null;
+    this.save('omnithread_session_user', null);
+    this.notify();
+  }
+
   setTab(tab) {
     this.currentTab = tab;
     this.notify();
@@ -197,7 +231,7 @@ class StateManager {
   togglePlatformActive(platformId) {
     if (this.platforms[platformId]) {
       this.platforms[platformId].active = !this.platforms[platformId].active;
-      this.save(STORAGE_KEYS.PLATFORMS, this.platforms);
+      this.saveUserData();
       this.notify();
     }
   }
@@ -205,7 +239,7 @@ class StateManager {
   togglePlatformAutoDelist(platformId) {
     if (this.platforms[platformId]) {
       this.platforms[platformId].autoDelist = !this.platforms[platformId].autoDelist;
-      this.save(STORAGE_KEYS.PLATFORMS, this.platforms);
+      this.saveUserData();
       this.notify();
     }
   }
@@ -213,7 +247,7 @@ class StateManager {
   updatePlatformMarkup(platformId, newMarkup) {
     if (this.platforms[platformId]) {
       this.platforms[platformId].defaultMarkup = Number(newMarkup);
-      this.save(STORAGE_KEYS.PLATFORMS, this.platforms);
+      this.saveUserData();
       this.notify();
     }
   }
@@ -240,7 +274,7 @@ class StateManager {
     };
 
     this.clothes.unshift(newItem);
-    this.save(STORAGE_KEYS.CLOTHES, this.clothes);
+    this.saveUserData();
 
     // Add activity notification
     this.addNotification({
@@ -262,14 +296,14 @@ class StateManager {
     if (item) {
       if (!item.platformPrices) item.platformPrices = {};
       item.platformPrices[platformId] = Number(newPrice);
-      this.save(STORAGE_KEYS.CLOTHES, this.clothes);
+      this.saveUserData();
       this.notify();
     }
   }
 
   deleteCloth(itemId) {
     this.clothes = this.clothes.filter(c => c.id !== itemId);
-    this.save(STORAGE_KEYS.CLOTHES, this.clothes);
+    this.saveUserData();
     this.notify();
   }
 
@@ -309,8 +343,6 @@ class StateManager {
       buyerUsername: buyerUsername || 'vintage_buyer_' + Math.floor(1000 + Math.random() * 9000)
     };
 
-    this.save(STORAGE_KEYS.CLOTHES, this.clothes);
-
     // Create celebratory Sale Notification
     const notif = {
       id: 'notif_' + Date.now(),
@@ -328,7 +360,7 @@ class StateManager {
     };
 
     this.notifications.unshift(notif);
-    this.save(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
+    this.saveUserData();
 
     this.notify();
     return { item, notification: notif };
@@ -340,13 +372,13 @@ class StateManager {
       unread: true,
       ...notif
     });
-    this.save(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
+    this.saveUserData();
     this.notify();
   }
 
   markAllNotificationsRead() {
     this.notifications.forEach(n => n.unread = false);
-    this.save(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
+    this.saveUserData();
     this.notify();
   }
 

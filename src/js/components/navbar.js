@@ -88,6 +88,21 @@ export function renderNavbar(container) {
           </svg>
           ${unreadCount > 0 ? `<span class="notification-count">${unreadCount}</span>` : ''}
         </button>
+
+        <!-- User Hub & Sign Out -->
+        ${store.currentUser ? `
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: 0.5rem; padding-left: 0.75rem; border-left: 1px solid var(--bg-card-border);">
+            <div style="text-align: right; display: flex; flex-direction: column;">
+              <span style="font-size: 0.75rem; font-weight: 700; color: #fff;">${store.currentUser.name}</span>
+              <span style="font-size: 0.65rem; color: var(--text-muted);">${store.currentUser.email}</span>
+            </div>
+            <button id="btn-logout" class="btn-icon-only" title="Sign out of your hub" style="color: var(--color-danger);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
@@ -150,6 +165,15 @@ export function renderNavbar(container) {
     bellBtn.addEventListener('click', () => {
       store.markAllNotificationsRead();
       store.setTab('sales');
+    });
+  }
+
+  // Logout button
+  const logoutBtn = container.querySelector('#btn-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      store.logout();
+      notificationsUI.showInfoToast('Signed Out', 'You have been logged out of your reseller hub.');
     });
   }
 }
